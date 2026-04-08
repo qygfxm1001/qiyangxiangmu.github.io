@@ -5,6 +5,7 @@
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>浇桩施工进度图</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
         :root {
             --apple-blue: #007AFF;
@@ -154,6 +155,19 @@
             min-height: 0;
         }
 
+        .chart-wrap {
+            border-radius: 16px;
+            border: 1px solid rgba(0,0,0,0.10);
+            background: rgba(255,255,255,0.55);
+            padding: 10px;
+            margin-bottom: 12px;
+        }
+
+        #monthly-chart {
+            width: 100%;
+            height: 280px;
+        }
+
         table {
             width: 100%;
             border-collapse: separate;
@@ -294,6 +308,9 @@
         </div>
 
         <div class="glass card">
+            <div class="chart-wrap">
+                <div id="monthly-chart"></div>
+            </div>
             <div id="day-bar" class="day-bar"></div>
             <div class="editor-actions">
                 <div class="editor-title" id="editor-title">当日进度</div>
@@ -335,6 +352,91 @@
         const AUTH_STORAGE_KEY = 'qy_auth_v1';
         let AUTH_ROLE = 'guest';
         let AUTH_PHONE = '';
+
+        let monthlyChart = null;
+        let __chartTimer = null;
+
+        function initMonthlyChart() {
+            if (!window.echarts) return;
+            const el = document.getElementById('monthly-chart');
+            if (!el) return;
+            if (monthlyChart) return;
+            const isMobile = window.innerWidth <= 980;
+            const renderer = isMobile ? 'svg' : 'canvas';
+            const dpr = Math.max(2, Number(window.devicePixelRatio) || 1);
+            const opts = renderer === 'canvas' ? { renderer, devicePixelRatio: dpr } : { renderer };
+            monthlyChart = echarts.init(el, null, opts);
+        }
+
+        function scheduleRenderMonthlyChart() {
+            if (__chartTimer) clearTimeout(__chartTimer);
+            __chartTimer = setTimeout(() => renderMonthlyChart(), 80);
+        }
+
+        function getLiveDailyQty(squad, dateStr) {
+            if (AUTH_ROLE === 'admin' && dateStr === selectedDateStr) {
+                const table = document.getElementById('editor');
+                if (table) {
+                    const el = table.querySelector(`input[data-squad="${squad}"][data-field="daily"]`);
+                    const v = parseNullableNumber(el ? el.value : '');
+                    if (typeof v === 'number') return v;
+                    if (v === null) return 0;
+                }
+            }
+            const rec = dataMap.get(keyOf(squad, dateStr));
+            const daily = rec ? rec.daily_qty : null;
+            return (typeof daily === 'number' && !isNaN(daily)) ? daily : 0;
+        }
+
+        function renderMonthlyChart() {
+            initMonthlyChart();
+            if (!monthlyChart) return;
+            const { year, month } = parseMonth();
+            const monthLabel = `${year}-${pad2(month)}`;
+
+            let targetTotal = 0;
+            let hasTarget = false;
+            for (let squad = SQUAD_MIN; squad <= SQUAD_MAX; squad++) {
+                const a = squadAreaMap.get(areaKey(squad));
+                if (typeof a === 'number' && !isNaN(a)) { targetTotal += a; hasTarget = true; }
+            }
+
+            const days = Array.from({ length: monthDays }, (_, i) => i + 1);
+            const dailyTotals = [];
+            const cumulativeTotals = [];
+            const percentTotals = [];
+
+            let running = 0;
+            for (const day of days) {
+                const ds = `${year}-${pad2(month)}-${pad2(day)}`;
+                let sum = 0;
+                for (let squad = SQUAD_MIN; squad <= SQUAD_MAX; squad++) {
+                    sum += getLiveDailyQty(squad, ds);
+                }
+                running += sum;
+                dailyTotals.push(Number(sum.toFixed(3)));
+                cumulativeTotals.push(Number(running.toFixed(3)));
+                percentTotals.push(hasTarget && targetTotal > 0 ? Number(((running / targetTotal) * 100).toFixed(2)) : null);
+            }
+
+            const option = {
+                title: { text: `月度进度曲线 · ${monthLabel}`, left: 'center', top: 6, textStyle: { fontSize: 14, fontWeight: 900, color: '#1d1d1f' } },
+                grid: { left: 40, right: 44, top: 44, bottom: 30 },
+                tooltip: { trigger: 'axis' },
+                legend: { top: 24, left: 'center', itemWidth: 14, itemHeight: 8, textStyle: { fontSize: 12, fontWeight: 800 } },
+                xAxis: { type: 'category', data: days.map(d => `${d}`), axisLabel: { fontWeight: 800 } },
+                yAxis: [
+                    { type: 'value', name: '个', nameTextStyle: { fontWeight: 800 }, axisLabel: { fontWeight: 800 } },
+                    { type: 'value', name: '%', min: 0, max: 100, axisLabel: { formatter: '{value}%', fontWeight: 800 }, splitLine: { show: false } }
+                ],
+                series: [
+                    { name: '当日完成', type: 'line', smooth: true, showSymbol: false, lineStyle: { width: 3 }, data: dailyTotals },
+                    { name: '累计完成', type: 'line', smooth: true, showSymbol: false, lineStyle: { width: 3 }, data: cumulativeTotals },
+                    { name: '完成%', type: 'line', yAxisIndex: 1, smooth: true, showSymbol: false, lineStyle: { width: 3 }, data: percentTotals }
+                ]
+            };
+            monthlyChart.setOption(option, true);
+        }
 
         function getAdminPhones() {
             const v = window.ADMIN_PHONES;
@@ -673,9 +775,11 @@
                 const pctEl = document.getElementById(`pct-${squad}`);
                 if (pctEl) pctEl.textContent = pct === null ? '—' : (pct.toFixed(1) + '%');
                 updateTotals();
+                scheduleRenderMonthlyChart();
             };
 
             updateTotals();
+            scheduleRenderMonthlyChart();
         }
 
         async function loadSquads() {
@@ -814,6 +918,7 @@
             if (title) title.textContent = `当日进度 · ${selectedDateStr}`;
             buildDayBar();
             buildEditor();
+            scheduleRenderMonthlyChart();
         }
 
         (async () => {
@@ -821,6 +926,10 @@
             buildMonthOptions();
             reload();
         })();
+
+        window.addEventListener('resize', () => {
+            if (monthlyChart) monthlyChart.resize();
+        });
     </script>
 </body>
 </html>
