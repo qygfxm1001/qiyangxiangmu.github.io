@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>浇桩施工进度图</title>
+    <title>组件施工安装进度图</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
         :root {
@@ -292,12 +292,13 @@
             .controls a.btn { width: 100%; text-align: center; box-sizing: border-box; }
             table { min-width: 860px; border-spacing: 6px; }
         }
+
     </style>
 </head>
 <body>
     <div class="container">
         <div class="glass header">
-            <div class="title">浇桩施工进度图</div>
+            <div class="title">组件施工安装进度图</div>
             <div class="controls">
                 <select id="month" class="select"></select>
                 <button class="btn" onclick="reload()">刷新</button>
@@ -343,7 +344,7 @@
 
     <script src="config.js?v=20260408"></script>
     <script>
-        const PROGRESS_TYPE = 'pile';
+        const PROGRESS_TYPE = 'module';
         const SQUAD_MIN = 1;
         const SQUAD_MAX = 22;
         const API_BASE = (window.API_BASE || '').replace(/\/$/, '');
@@ -561,6 +562,7 @@
         let selectedDateStr = '';
 
         function pad2(n) { return String(n).padStart(2, '0'); }
+        function toDateStr(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
         function monthLastDay(year, month) { return new Date(year, month, 0).getDate(); }
 
         function setStatus(text) {
@@ -679,7 +681,7 @@
             const head = `
                 <thead><tr>
                     <th class="sticky-left">方阵</th>
-                    <th>桩基浇筑总量（个）</th>
+                    <th>桩基础总量（个）</th>
                     <th>当天完成（个）</th>
                     <th>累计完成（个）</th>
                     <th>完成%</th>
@@ -701,8 +703,8 @@
                 rows.push(`
                     <tr>
                         <td class="sticky-left">#${squad}</td>
-                        <td><input class="inp" data-squad="${squad}" data-field="area" type="number" step="1" value="${areaMu === undefined ? '' : (areaMu === null ? '' : areaMu)}" placeholder="例如：120桩" ${canEdit ? '' : 'disabled'}></td>
-                        <td><input class="inp" data-squad="${squad}" data-field="daily" type="number" step="1" value="${dailyRaw}" placeholder="例如：8" ${canEdit ? '' : 'disabled'}></td>
+                        <td><input class="inp" data-squad="${squad}" data-field="area" type="number" step="1" value="${areaMu === undefined ? '' : (areaMu === null ? '' : areaMu)}" placeholder="例如：1000" ${canEdit ? '' : 'disabled'}></td>
+                        <td><input class="inp" data-squad="${squad}" data-field="daily" type="number" step="1" value="${dailyRaw}" placeholder="例如：80" ${canEdit ? '' : 'disabled'}></td>
                         <td><input class="inp" data-squad="${squad}" data-field="cumulative" type="text" value="${cumulativeDisplayStr}" placeholder="自动累计" disabled></td>
                         <td class="percent-cell" id="pct-${squad}">${pct === null ? '—' : pct.toFixed(1) + '%'}</td>
                         <td><input class="inp" data-squad="${squad}" data-field="memo" type="text" value="${escapeAttr(memoRaw)}" placeholder="备注" ${canEdit ? '' : 'disabled'}></td>
@@ -748,7 +750,7 @@
                 const totalCumEl = document.getElementById('total-cumulative');
                 const totalPctEl = document.getElementById('total-percent');
 
-                if (totalAreaEl) totalAreaEl.textContent = hasArea ? (formatNumber(sumArea) + ' 桩') : '—';
+                if (totalAreaEl) totalAreaEl.textContent = hasArea ? (formatNumber(sumArea) + ' 个') : '—';
                 if (totalDailyEl) totalDailyEl.textContent = hasDaily ? (formatNumber(sumDaily) + ' 个') : '—';
                 if (totalCumEl) totalCumEl.textContent = hasCum ? (formatNumber(sumCum) + ' 个') : '—';
 
@@ -875,7 +877,7 @@
                         body: JSON.stringify(p)
                     });
                     if (!resArea.ok) {
-                        alert('面积保存失败：' + resArea.status);
+                        alert('数量保存失败：' + resArea.status);
                         return;
                     }
                     if (p.area_mu === null) squadAreaMap.delete(areaKey(p.squad));
