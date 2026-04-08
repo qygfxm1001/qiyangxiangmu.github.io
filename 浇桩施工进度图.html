@@ -235,7 +235,7 @@
             <div class="controls">
                 <select id="month" class="select"></select>
                 <button class="btn" onclick="reload()">刷新</button>
-                <a class="btn secondary" href="/index.html">返回主页</a>
+                <a class="btn secondary" href="index.html">返回主页</a>
             </div>
         </div>
 
@@ -258,10 +258,13 @@
         </div>
     </div>
 
+    <script src="config.js"></script>
     <script>
         const PROGRESS_TYPE = 'pile';
         const SQUAD_MIN = 1;
         const SQUAD_MAX = 22;
+        const API_BASE = (window.API_BASE || '').replace(/\/$/, '');
+        const api = (path) => API_BASE + path;
 
         let monthStr = '';
         let monthDays = 0;
@@ -490,7 +493,7 @@
         async function loadSquads() {
             setStatus('加载中...');
             try {
-                const res = await fetch(`/api/get_progress_squads?type=${encodeURIComponent(PROGRESS_TYPE)}`);
+                const res = await fetch(api(`/api/get_progress_squads?type=${encodeURIComponent(PROGRESS_TYPE)}`));
                 if (!res.ok) {
                     squadAreaMap = new Map();
                     return;
@@ -515,7 +518,7 @@
             const monthParam = `${year}-${pad2(month)}`;
             setStatus('加载中...');
             try {
-                const res = await fetch(`/api/get_progress?type=${encodeURIComponent(PROGRESS_TYPE)}&month=${encodeURIComponent(monthParam)}`);
+                const res = await fetch(api(`/api/get_progress?type=${encodeURIComponent(PROGRESS_TYPE)}&month=${encodeURIComponent(monthParam)}`));
                 if (!res.ok) {
                     setStatus(`加载失败：${res.status}`);
                     return;
@@ -573,7 +576,7 @@
 
             try {
                 for (const p of areaPayloads) {
-                    const resArea = await fetch('/api/save_progress_squad', {
+                    const resArea = await fetch(api('/api/save_progress_squad'), {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(p)
@@ -587,7 +590,7 @@
                 }
 
                 if (progressPayloads.length > 0) {
-                    const res = await fetch('/api/save_progress', {
+                    const res = await fetch(api('/api/save_progress'), {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(progressPayloads)

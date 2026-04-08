@@ -388,9 +388,12 @@
         </div>
     </div>
 
+    <script src="config.js"></script>
     <script src="weather_data.js?v=1.1"></script>
     <script>
         let myChart = echarts.init(document.getElementById('barometer-chart'));
+        const API_BASE = (window.API_BASE || '').replace(/\/$/, '');
+        const api = (path) => API_BASE + path;
         
         const typeColorMap = {
             0: '#ff9500', // 晴
@@ -540,7 +543,7 @@
         async function initDashboard() {
             const todayStr = getTodayStr();
             try {
-                const res = await fetch('/api/get_weather');
+                const res = await fetch(api('/api/get_weather'));
                 if (res.ok) {
                     window.WEATHER_DATA = await res.json();
                 }
@@ -603,7 +606,7 @@
 
         async function loadLogs() {
             try {
-                const response = await fetch('/api/get_logs');
+                const response = await fetch(api('/api/get_logs'));
                 currentLogs = await response.json();
                 const container = document.getElementById('log-container');
                 const statsEl = document.getElementById('log-stats');
@@ -693,7 +696,7 @@
             if (!dateVal) { alert('请选择日期'); return; }
             if (!confirm(`确定删除 ${dateVal} 的施工日志吗？`)) return;
             try {
-                const res = await fetch('/api/delete_log', {
+                const res = await fetch(api('/api/delete_log'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ date: dateVal })
@@ -746,13 +749,13 @@
             if (date > todayStr) { alert('不能更改未来日期的数据'); return; }
 
             try {
-                const weatherRes = await fetch('/api/update_weather', {
+                const weatherRes = await fetch(api('/api/update_weather'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(weatherData)
                 });
 
-                const logRes = await fetch('/api/save_log', {
+                const logRes = await fetch(api('/api/save_log'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(logData)
@@ -762,7 +765,7 @@
                     alert('保存成功！');
                     closeLogModal();
                     try {
-                        const fresh = await fetch('/api/get_weather');
+                        const fresh = await fetch(api('/api/get_weather'));
                         if (fresh.ok) {
                             window.WEATHER_DATA = await fresh.json();
                         }
@@ -1172,11 +1175,11 @@
             btn.disabled = true;
             
             try {
-                const response = await fetch('/api/sync_weather', { method: 'POST' });
+                const response = await fetch(api('/api/sync_weather'), { method: 'POST' });
                 const result = await response.json();
                 if (result.status === 'success') {
                     try {
-                        const fresh = await fetch('/api/get_weather');
+                        const fresh = await fetch(api('/api/get_weather'));
                         if (fresh.ok) {
                             window.WEATHER_DATA = await fresh.json();
                         }
@@ -1186,7 +1189,7 @@
                     alert('同步成功（' + (result.source || '数据源') + '），日历已更新。');
                 } else if (result.status === 'offline') {
                     try {
-                        const fresh = await fetch('/api/get_weather');
+                        const fresh = await fetch(api('/api/get_weather'));
                         if (fresh.ok) {
                             window.WEATHER_DATA = await fresh.json();
                         }
@@ -1208,7 +1211,7 @@
 
         async function openProgressImage(fileName) {
             const name = fileName || '清表施工进度图.jpg';
-            const url = encodeURI('/' + name);
+            const url = encodeURI(name);
             try {
                 const res = await fetch(url, { method: 'HEAD' });
                 if (!res.ok) {
