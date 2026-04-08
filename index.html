@@ -1064,12 +1064,26 @@
 
             const gridPink = 'rgba(255,105,180,0.78)';
             const gridPinkLight = 'rgba(255,105,180,0.22)';
-            const cellW = yearMode ? 24 : 110;
-            const cellH = yearMode ? 20 : 86;
-            const padX = yearMode ? 2 : 6;
-            const padY = yearMode ? 2 : 6;
+            const chartEl = document.getElementById('barometer-chart');
+            const chartW = chartEl ? chartEl.clientWidth : 0;
+            const isMobile = window.innerWidth <= 980;
+            const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+            const baseW = chartW > 0 ? chartW : (isMobile ? 360 : 920);
+            const availableW = Math.max(280, baseW - (isMobile ? 24 : 40));
+            const computedCellW = Math.floor(availableW / 7);
+
+            const cellW = yearMode ? 24 : clamp(computedCellW, isMobile ? 44 : 70, 110);
+            const cellH = yearMode ? 20 : clamp(Math.floor(cellW * 0.78), isMobile ? 44 : 70, 86);
+            const padX = yearMode ? 2 : (isMobile ? 4 : 6);
+            const padY = yearMode ? 2 : (isMobile ? 4 : 6);
             const innerW = cellW - padX * 2;
             const innerH = cellH - padY * 2;
+            if (chartEl && isMobile && !yearMode) {
+                const rows = 6;
+                const needed = rows * cellH + 140;
+                chartEl.style.height = Math.max(440, Math.min(820, needed)) + 'px';
+            }
 
             const option = {
                 tooltip: {
@@ -1088,9 +1102,9 @@
                     }
                 },
                 calendar: {
-                    top: yearMode ? 30 : 50,
+                    top: yearMode ? 30 : (isMobile ? 40 : 50),
                     left: 'center',
-                    cellSize: yearMode ? [24, 20] : [110, 86],
+                    cellSize: [cellW, cellH],
                     orient: 'vertical',
                     range: [displayRangeStart, displayRangeEnd],
                     itemStyle: { borderWidth: 0, borderColor: 'transparent', color: 'transparent' },
@@ -1103,9 +1117,9 @@
                         nameMap: ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'], 
                         color: '#1d1d1f',
                         firstDay: 0,
-                        fontSize: yearMode ? 14 : 18,
+                        fontSize: yearMode ? 14 : (isMobile ? 14 : 18),
                         fontWeight: 'bold',
-                        margin: yearMode ? 10 : 15,
+                        margin: yearMode ? 10 : (isMobile ? 10 : 15),
                         position: 'start'
                     }
                 },
