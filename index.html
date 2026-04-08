@@ -439,7 +439,23 @@
     <script src="config.js"></script>
     <script src="weather_data.js?v=1.1"></script>
     <script>
-        let myChart = echarts.init(document.getElementById('barometer-chart'));
+        let myChart = null;
+        let CHART_RENDERER = '';
+        function initChart(force) {
+            const dom = document.getElementById('barometer-chart');
+            if (!dom) return;
+            const isMobile = window.innerWidth <= 980;
+            const renderer = isMobile ? 'svg' : 'canvas';
+            if (!force && myChart && CHART_RENDERER === renderer) return;
+            if (myChart) {
+                try { myChart.dispose(); } catch {}
+                myChart = null;
+            }
+            const dpr = Math.max(2, Number(window.devicePixelRatio) || 1);
+            const opts = renderer === 'canvas' ? { renderer, devicePixelRatio: dpr } : { renderer };
+            myChart = echarts.init(dom, null, opts);
+            CHART_RENDERER = renderer;
+        }
         const API_BASE = (window.API_BASE || '').replace(/\/$/, '');
         const api = (path) => API_BASE + path;
 
@@ -721,6 +737,8 @@
             if (!window.WEATHER_DATA || window.WEATHER_DATA.length === 0) {
                 return;
             }
+
+            initChart();
             
             const weatherOptions = Object.keys(typeColorMap).map(code => 
                 `<option value="${code}">${typeNameMap[code]}</option>`
@@ -1010,6 +1028,8 @@
         }
 
         function renderChart() {
+            initChart();
+            if (!myChart) return;
             const select = document.getElementById('month-select');
             const selectedMonth = select.value;
             
@@ -1062,8 +1082,6 @@
                 cursor.setDate(cursor.getDate() + 1);
             }
 
-            const gridPink = 'rgba(255,105,180,0.78)';
-            const gridPinkLight = 'rgba(255,105,180,0.22)';
             const chartEl = document.getElementById('barometer-chart');
             const chartW = chartEl ? chartEl.clientWidth : 0;
             const isMobile = window.innerWidth <= 980;
@@ -1083,6 +1101,7 @@
                 const rows = 6;
                 const needed = rows * cellH + 140;
                 chartEl.style.height = Math.max(440, Math.min(820, needed)) + 'px';
+                myChart.resize();
             }
 
             const option = {
@@ -1114,6 +1133,7 @@
                         show: false
                     },
                     dayLabel: { 
+                        show: yearMode,
                         nameMap: ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'], 
                         color: '#1d1d1f',
                         firstDay: 0,
@@ -1171,6 +1191,10 @@
                             // 综合判断背景明度
                             const amLight = isLight(amCode);
                             const pmLight = isLight(pmCode);
+                            const dividerW = isMobile ? 4 : 3;
+                            const labelStrokeW = isMobile ? 3 : 2;
+                            const labelFont = isMobile ? 13 : 12;
+                            const dateFont = isMobile ? 16 : 16;
 
                             const children = [
                                     {
@@ -1186,13 +1210,8 @@
                                     {
                                         type: 'line',
                                         shape: { x1: x, y1: y + slotHeight, x2: x + width, y2: y + slotHeight },
-                                        style: { stroke: 'rgba(255,255,255,0.98)', lineWidth: 3, shadowBlur: 2, shadowColor: 'rgba(0,0,0,0.25)' }
+                                        style: { stroke: 'rgba(255,255,255,0.98)', lineWidth: dividerW, shadowBlur: 2, shadowColor: 'rgba(0,0,0,0.25)' }
                                     },
-                                    {
-                                        type: 'rect',
-                                        shape: { x: x, y: y, width: width, height: height },
-                                        style: { fill: 'transparent', stroke: gridPink, lineWidth: 2 }
-                                    }
                                 ];
 
                             if (!yearMode) {
@@ -1206,7 +1225,7 @@
                                                 y: y + 18,
                                                 textAlign: 'center',
                                                 textVerticalAlign: 'middle',
-                                                fontSize: 16,
+                                                fontSize: dateFont,
                                                 fontWeight: 'bold',
                                                 fontFamily: 'Microsoft YaHei, Arial, sans-serif'
                                             };
@@ -1229,8 +1248,8 @@
                                             textVerticalAlign: 'middle',
                                             fill: amCode === null ? placeholderText : (amLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)'),
                                             stroke: amCode === null ? 'rgba(255,255,255,0.0)' : 'rgba(0,0,0,0.25)',
-                                            lineWidth: amCode === null ? 0 : 2,
-                                            fontSize: 12,
+                                            lineWidth: amCode === null ? 0 : labelStrokeW,
+                                            fontSize: labelFont,
                                             fontWeight: 'bold',
                                             fontFamily: 'Microsoft YaHei, Arial, sans-serif'
                                         }
@@ -1244,8 +1263,8 @@
                                             textVerticalAlign: 'middle',
                                             fill: pmCode === null ? placeholderText : (pmLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)'),
                                             stroke: pmCode === null ? 'rgba(255,255,255,0.0)' : 'rgba(0,0,0,0.25)',
-                                            lineWidth: pmCode === null ? 0 : 2,
-                                            fontSize: 12,
+                                            lineWidth: pmCode === null ? 0 : labelStrokeW,
+                                            fontSize: labelFont,
                                             fontWeight: 'bold',
                                             fontFamily: 'Microsoft YaHei, Arial, sans-serif'
                                         }
@@ -1282,13 +1301,14 @@
                         const frameStroke = 'rgba(0,0,0,0.88)';
                         const frameW = 4;
                         const gridW = 3;
-                        const headerHeight = 40;
+                        const headerHeight = isMobile ? 34 : 40;
 
                         const xLeft = pStart[0] - cellW / 2;
                         const xRight = pEndTopRow[0] + cellW / 2;
                         const yTop = pStart[1] - cellH / 2;
                         const yBottom = pLast[1] + cellH / 2;
                         const yHeaderTop = yTop - headerHeight;
+                        const yHeaderCenter = yHeaderTop + headerHeight / 2;
 
                         const children = [
                             {
@@ -1302,6 +1322,25 @@
                                 style: { stroke: frameStroke, lineWidth: gridW }
                             }
                         ];
+
+                        const weekdayNames = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+                        const weekdayChildren = [];
+                        for (let i = 0; i < 7; i++) {
+                            weekdayChildren.push({
+                                type: 'text',
+                                style: {
+                                    text: weekdayNames[i],
+                                    x: xLeft + i * cellW + cellW / 2,
+                                    y: yHeaderCenter,
+                                    textAlign: 'center',
+                                    textVerticalAlign: 'middle',
+                                    fill: '#1d1d1f',
+                                    fontSize: isMobile ? 14 : 18,
+                                    fontWeight: 900,
+                                    fontFamily: 'Microsoft YaHei, Arial, sans-serif'
+                                }
+                            });
+                        }
 
                         for (let i = 1; i <= 6; i++) {
                             const x = xLeft + i * cellW;
@@ -1323,7 +1362,7 @@
 
                         myChart.setOption({
                             graphic: [
-                                { id: 'weekday-grid', type: 'group', silent: true, children: [] },
+                                { id: 'weekday-grid', type: 'group', silent: true, z: 190, children: weekdayChildren },
                                 {
                                     id: 'calendar-frame',
                                     type: 'group',
@@ -1411,9 +1450,14 @@
         }
 
         window.onload = initDashboard;
+        let __resizeTimer = null;
         window.onresize = () => {
-            myChart.resize();
-            renderChart();
+            if (__resizeTimer) clearTimeout(__resizeTimer);
+            __resizeTimer = setTimeout(() => {
+                initChart();
+                if (myChart) myChart.resize();
+                renderChart();
+            }, 120);
         };
     </script>
 </body>
