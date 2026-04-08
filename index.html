@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>祁阳项目 - 实时晴雨表 (Apple 升级版)</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        :root {
+            --apple-blue: #007AFF;
+            --apple-bg: #f5f5f7;
+            --glass-bg: rgba(255, 255, 255, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.3);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+            font-size: 22px;
+            line-height: 1.3;
+            margin: 0;
+            padding: 12px;
+            background: linear-gradient(180deg, #74b9ff 0%, #a29bfe 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+            color: #1d1d1f;
+            overflow: auto;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin: 8px 0 18px;
+            padding: 12px 14px;
+            color: white;
+            text-shadow: 0 6px 22px rgba(0,0,0,0.18);
+            background: rgba(0, 122, 255, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            border-radius: 20px;
+        }
+
+        .header h1 {
+            font-size: 52px;
+            margin: 0;
+            font-weight: 900;
+            letter-spacing: 6px;
+            line-height: 1.08;
+            text-shadow: 0 10px 28px rgba(0,0,0,0.35);
+        }
+        .header p {
+            opacity: 0.95;
+            margin-top: 6px;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-shadow: 0 8px 22px rgba(0,0,0,0.28);
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 240px minmax(0, 1fr) 320px;
+            gap: 20px;
+        }
+
+        .leftbar,
+        .main-content,
+        .sidebar {
+            display: flex;
+        }
+
+        .leftbar > .glass-card,
+        .main-content > .glass-card {
+            flex: 1;
+            width: 100%;
+        }
+
+        .sidebar > .glass-card {
+            flex: 1;
+            width: 100%;
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .current-weather {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 30px;
+            color: white;
+            background: rgba(0, 122, 255, 0.3);
+            border-radius: 20px;
+        }
+
+        .temp-main { font-size: 72px; font-weight: 200; margin: 0; }
+        .condition-text { font-size: 24px; font-weight: 400; margin: 5px 0; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: rgba(255,255,255,0.4);
+            border-radius: 15px;
+        }
+
+        .stat-label { font-size: 16px; color: #515154; margin-bottom: 5px; }
+        .stat-value { font-size: 24px; font-weight: 800; }
+
+        #barometer-chart {
+            width: 100%;
+            height: 620px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .apple-btn {
+            background: var(--apple-blue);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-weight: 500;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .apple-btn:hover { background: #0056b3; transform: translateY(-1px); }
+        .apple-btn-secondary { background: rgba(0,0,0,0.05); color: #1d1d1f; }
+        .apple-btn-danger { background: #ff3b30; }
+        .apple-btn-danger:hover { background: #d70015; }
+
+        .btn-group .apple-btn {
+            font-size: 17px !important;
+        }
+
+        .log-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .log-item {
+            padding: 15px;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            transition: background 0.3s;
+            cursor: pointer;
+        }
+
+        .log-item:hover { background: rgba(255,255,255,0.5); }
+        .log-date { font-weight: 800; font-size: 18px; }
+        .log-brief { font-size: 16px; color: #86868b; margin-top: 4px; }
+
+        .log-stats {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(0,0,0,0.06);
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .log-stats-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(0,0,0,0.06);
+            color: #1d1d1f;
+            border: 1px solid rgba(0,0,0,0.10);
+            font-size: 17px;
+            font-weight: 800;
+        }
+
+        .progress-links {
+            display: grid;
+            gap: 8px;
+        }
+
+        .progress-card {
+            margin-top: 12px;
+            padding: 14px;
+            border-radius: 16px;
+            background: rgba(255,255,255,0.45);
+            border: 1px solid rgba(0,0,0,0.06);
+        }
+
+        .progress-card-title {
+            text-align: center;
+            font-size: 18px;
+            font-weight: 800;
+            color: rgba(29,29,31,0.72);
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .progress-btn {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 800;
+        }
+
+        /* 模态框样式 */
+        .modal-mask {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: white;
+            width: 500px;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px; }
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d2d2d7;
+            border-radius: 10px;
+            font-size: 18px;
+            box-sizing: border-box;
+        }
+
+        .form-group select {
+            font-size: 18px;
+        }
+
+        /* 天气颜色映射 */
+        .color-sunny { color: #ff9f0a; }
+        .color-rainy { color: #007aff; }
+        .color-cloudy { color: #8e8e93; }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 17px;
+            background: rgba(255,255,255,0.4);
+            padding: 4px 10px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>祁阳市肖家镇(牛头湾村和牛岭村)光伏发电项目</h1>
+            <p>工程气象日历与施工日志 · 两时段（上午/下午）</p>
+        </div>
+
+        <div class="dashboard">
+            <div class="leftbar">
+                <div class="glass-card">
+                    <h3 style="margin-top:0; text-align:center; color: var(--apple-blue); font-size: 26px; font-weight: 900;">光伏区施工进度</h3>
+                    <div class="progress-links">
+                        <button class="apple-btn apple-btn-secondary progress-btn" onclick="openProgressImage('清表施工进度图.html')">清表施工进度图</button>
+                        <button class="apple-btn apple-btn-secondary progress-btn" onclick="openProgressImage('钻孔施工进度图.html')">钻孔施工进度图</button>
+                        <button class="apple-btn apple-btn-secondary progress-btn" onclick="openProgressImage('浇桩施工进度图.html')">浇桩施工进度图</button>
+                        <button class="apple-btn apple-btn-secondary progress-btn" onclick="openProgressImage('支架安装施工进度图.jpg')">支架安装施工进度图</button>
+                        <button class="apple-btn apple-btn-secondary progress-btn" onclick="openProgressImage('组件施工安装进度图.jpg')">组件施工安装进度图</button>
+                    </div>
+                </div>
+            </div>
+            <div class="main-content">
+                <div class="glass-card" style="text-align: center; position: relative; padding: 15px 20px;">
+                    <div style="position: absolute; top: 15px; right: 20px; display: flex; gap: 8px; align-items: center; z-index: 100; flex-wrap: wrap; justify-content: flex-end; max-width: calc(100% - 40px);">
+                        <select id="month-select" class="apple-btn apple-btn-secondary" style="padding: 2px 8px; height: 32px; font-size: 13px; width: 140px; min-width: 140px; box-sizing: border-box; border: 1px solid rgba(0,0,0,0.08); background: rgba(255,255,255,0.85); color: #1d1d1f;" onchange="renderChart()">
+                            <option value="2026">2026全年</option>
+                            <option value="2026-01">2026年1月</option>
+                            <option value="2026-02">2026年2月</option>
+                            <option value="2026-03">2026年3月</option>
+                            <option value="2026-04">2026年4月</option>
+                            <option value="2026-05">2026年5月</option>
+                            <option value="2026-06">2026年6月</option>
+                            <option value="2026-07">2026年7月</option>
+                            <option value="2026-08">2026年8月</option>
+                            <option value="2026-09">2026年9月</option>
+                            <option value="2026-10">2026年10月</option>
+                            <option value="2026-11">2026年11月</option>
+                            <option value="2026-12">2026年12月</option>
+                        </select>
+                        <div class="btn-group" style="margin-top: 0; gap: 6px; flex-wrap: wrap; justify-content: flex-end;">
+                            <button class="apple-btn" style="height: 32px; padding: 0 12px; font-size: 13px;" onclick="refreshData(this)">刷新同步</button>
+                            <button class="apple-btn apple-btn-secondary" style="height: 32px; padding: 0 12px; font-size: 13px;" onclick="exportData()">导出报表</button>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 10px; padding-top: 5px;">
+                        <h3 style="margin: 0; font-size: 16px; opacity: 0.5; font-weight: 500; letter-spacing: 0.5px;">工程气象日历</h3>
+                        <div id="calendar-date-display" style="font-size: 36px; font-weight: 700; color: var(--apple-blue); margin: 5px 0;">2026年04月06日</div>
+                    </div>
+
+                    <div id="annual-stats" style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin: 8px 0 2px;"></div>
+                    <div id="barometer-chart"></div>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="glass-card">
+                    <h3 style="margin-top:0; text-align:center; color: var(--apple-blue); font-size: 26px; font-weight: 900;">施工日志</h3>
+                    <div class="log-list" id="log-container">
+                        <div style="text-align:center; padding:40px; color:#86868b;">暂无记录</div>
+                    </div>
+                    <button class="apple-btn" style="width:100%; margin-top:20px;" onclick="openLogModal()">+ 编写今日日志</button>
+                    <div id="log-stats" class="log-stats"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-mask" id="log-modal">
+        <div class="modal-content">
+            <h3 style="margin-top:0;" id="modal-title">编写施工日志</h3>
+            <div class="form-group">
+                <label>选择日期</label>
+                <input type="date" id="log-date">
+            </div>
+            <div class="form-group" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                <div>
+                    <label>上午天气</label>
+                    <select id="weather-am" style="width:100%; padding:8px; border-radius:8px; border:1px solid #d2d2d7;"></select>
+                </div>
+                <div>
+                    <label>下午天气</label>
+                    <select id="weather-pm" style="width:100%; padding:8px; border-radius:8px; border:1px solid #d2d2d7;"></select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>主要施工内容</label>
+                <textarea id="work_content" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label>人员及机械安排</label>
+                <textarea id="personnel_machinery" rows="2"></textarea>
+            </div>
+            <div class="form-group">
+                <label>安全及质量情况</label>
+                <textarea id="safety_quality" rows="2"></textarea>
+            </div>
+            <div class="form-group">
+                <label>备注</label>
+                <input type="text" id="memo">
+            </div>
+            <div style="display:flex; justify-content: space-between; align-items:center; margin-top: 20px; gap: 10px;">
+                <button id="delete-log-btn" class="apple-btn apple-btn-danger" style="display:none;" onclick="deleteLog()">删除日志</button>
+                <div style="display:flex; gap: 10px; justify-content:flex-end;">
+                    <button class="apple-btn apple-btn-secondary" onclick="closeLogModal()">取消</button>
+                    <button class="apple-btn" onclick="saveLog()">保存日志</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="weather_data.js?v=1.1"></script>
+    <script>
+        let myChart = echarts.init(document.getElementById('barometer-chart'));
+        
+        const typeColorMap = {
+            0: '#ff9500', // 晴
+            1: '#005bff', // 中雨
+            2: '#6b7280', // 阴/多云
+            3: '#ff1b1b', // 大雨
+            5: '#ffffff', // 雪
+            6: '#000000', // 阻工
+            7: '#2ec7ff'  // 小雨
+        };
+
+        const typeNameMap = {
+            0: '晴', 1: '中雨', 2: '阴/多云', 3: '大雨', 5: '雪', 6: '阻工', 7: '小雨',
+            4: '阴/多云'
+        };
+
+        const WEATHER_CODE_ORDER = [0, 2, 7, 1, 3, 5, 6];
+        const PROJECT_START_DATE = '2026-01-01';
+        const PROJECT_END_DATE = '2026-12-31';
+
+        function getTodayStr() {
+            const d = new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        function toCnDate(dateStr) {
+            if (!dateStr || dateStr.indexOf('-') === -1) return dateStr || '';
+            const parts = dateStr.split('-');
+            return `${parts[0]}年${parts[1]}月${parts[2]}日`;
+        }
+
+        function pickCode(primary, fallback, defaultValue) {
+            if (primary !== undefined && primary !== null && primary !== '') return primary;
+            if (fallback !== undefined && fallback !== null && fallback !== '') return fallback;
+            return defaultValue;
+        }
+
+        function setTextIfExists(id, text) {
+            const el = document.getElementById(id);
+            if (el) el.innerText = text;
+        }
+
+        function getDayCategoryCode(item) {
+            const am = Number(pickCode(item.am_code, item.condition_code, 2));
+            const pm = Number(pickCode(item.pm_code, item.condition_code, 2));
+            const codes = [am, pm].map(c => (c === 4 ? 2 : c));
+
+            if (codes.includes(6)) return 6;
+            if (codes.includes(3)) return 3;
+            if (codes.includes(1)) return 1;
+            if (codes.includes(7)) return 7;
+            if (codes.includes(5)) return 5;
+            if (codes.includes(2)) return 2;
+            return 0;
+        }
+
+        function renderAnnualStats(todayStr) {
+            const container = document.getElementById('annual-stats');
+            if (!container) return;
+            if (!window.WEATHER_DATA || !Array.isArray(window.WEATHER_DATA)) {
+                container.innerHTML = '';
+                return;
+            }
+
+            const year = todayStr.slice(0, 4);
+            const start = `${year}-01-01`;
+            const end = todayStr;
+
+            const byDate = new Map();
+            window.WEATHER_DATA.forEach(item => {
+                if (!item || !item.date) return;
+                const d = item.date;
+                if (d < start || d > end) return;
+                if (d.slice(0, 4) !== year) return;
+                byDate.set(d, item);
+            });
+
+            const counts = {};
+            WEATHER_CODE_ORDER.forEach(code => { counts[code] = 0; });
+            let total = 0;
+
+            for (const item of byDate.values()) {
+                total += 1;
+                let code = getDayCategoryCode(item);
+                if (!counts.hasOwnProperty(code)) code = 2;
+                counts[code] += 1;
+            }
+
+            const pill = (text, bg, fg, border) => `
+                <div style="display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:999px; background:${bg}; color:${fg}; border:2px solid ${border}; font-size:16px; font-weight:1000; box-shadow: 0 8px 22px rgba(0,0,0,0.18);">
+                    ${text}
+                </div>
+            `;
+
+            const title = `
+                <div style="width:100%; display:flex; justify-content:center; margin-bottom:6px; color: rgba(29,29,31,0.70); font-size:14px; font-weight:900;">
+                    全年天气统计（截至 ${toCnDate(todayStr)}）
+                </div>
+            `;
+
+            const itemsHtml = WEATHER_CODE_ORDER.map(code => {
+                const name = typeNameMap[code];
+                const bg = typeColorMap[code];
+                const isSnow = code === 5;
+                const fg = isSnow ? '#1d1d1f' : '#fff';
+                const border = isSnow ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.18)';
+                return pill(`${name} ${counts[code]}天`, bg, fg, border);
+            }).join('');
+
+            const totalHtml = pill(`合计 ${total}天`, 'rgba(255,255,255,0.55)', '#1d1d1f', 'rgba(0,0,0,0.18)');
+
+            const parseDate = (s) => {
+                if (!s || s.indexOf('-') === -1) return null;
+                const d = new Date(s.replace(/-/g, '/'));
+                return isNaN(d.getTime()) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            };
+            const dayMs = 24 * 60 * 60 * 1000;
+            const diffDaysInclusive = (a, b) => Math.floor((b.getTime() - a.getTime()) / dayMs) + 1;
+
+            const sDate = parseDate(PROJECT_START_DATE);
+            const eDate = parseDate(PROJECT_END_DATE);
+            const tDate = parseDate(todayStr);
+
+            let scheduleHtml = '';
+            if (sDate && eDate && tDate) {
+                const totalDays = Math.max(0, diffDaysInclusive(sDate, eDate));
+                const countdown = Math.max(0, Math.floor((eDate.getTime() - tDate.getTime()) / dayMs));
+                const overdue = Math.max(0, Math.floor((tDate.getTime() - eDate.getTime()) / dayMs));
+
+            const redNum = (n) => `<span style="color:#ff1b1b; font-weight:1000;">${n}</span>`;
+            const totalPill = pill(`总工期 ${redNum(totalDays)}天`, 'rgba(255,255,255,0.55)', '#1d1d1f', 'rgba(0,0,0,0.18)');
+            const cdPill = overdue > 0
+                ? pill(`已超期 ${redNum(overdue)}天`, '#ff1b1b', '#fff', 'rgba(0,0,0,0.18)')
+                : pill(`倒计时 ${redNum(countdown)}天`, '#ff9500', '#1d1d1f', 'rgba(0,0,0,0.18)');
+
+                scheduleHtml = `<div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:10px;">${totalPill}${cdPill}</div>`;
+            }
+
+            container.innerHTML = title
+                + `<div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">${itemsHtml}${totalHtml}</div>`
+                + scheduleHtml;
+        }
+
+        async function initDashboard() {
+            const todayStr = getTodayStr();
+            try {
+                const res = await fetch('/api/get_weather');
+                if (res.ok) {
+                    window.WEATHER_DATA = await res.json();
+                }
+            } catch (e) {}
+
+            if (!window.WEATHER_DATA || window.WEATHER_DATA.length === 0) {
+                return;
+            }
+            
+            const weatherOptions = Object.keys(typeColorMap).map(code => 
+                `<option value="${code}">${typeNameMap[code]}</option>`
+            ).join('');
+            const orderedWeatherOptions = WEATHER_CODE_ORDER.map(code =>
+                `<option value="${code}">${typeNameMap[code]}</option>`
+            ).join('');
+            document.getElementById('weather-am').innerHTML = orderedWeatherOptions;
+            document.getElementById('weather-pm').innerHTML = orderedWeatherOptions;
+
+            const logDateInput = document.getElementById('log-date');
+            if (logDateInput) {
+                logDateInput.max = todayStr;
+            }
+            const calendarDateEl = document.getElementById('calendar-date-display');
+            if (calendarDateEl) {
+                calendarDateEl.innerText = toCnDate(todayStr);
+            }
+
+            // 设置下拉框为当前月份 (2026-04)
+            const curMonthStr = todayStr.slice(0, 7);
+            const select = document.getElementById('month-select');
+            if (select.querySelector(`option[value="${curMonthStr}"]`)) {
+                select.value = curMonthStr;
+            }
+
+            // 查找当天的气象记录显示在顶板
+            const latest = window.WEATHER_DATA.find(d => d.date === todayStr) || window.WEATHER_DATA[0];
+            
+            // 更新当前面板
+            setTextIfExists('cur-condition', typeNameMap[latest.condition_code] || latest.condition);
+            setTextIfExists('cur-temp', Math.round(latest.temp_max) + '°');
+            setTextIfExists('cur-range', `最低 ${Math.round(latest.temp_min)}°  最高 ${Math.round(latest.temp_max)}°`);
+            setTextIfExists('cur-humidity', latest.humidity + '%');
+            setTextIfExists('cur-wind', latest.wind_speed + ' 公里/小时');
+            setTextIfExists('cur-precip', latest.precipitation + ' 毫米');
+            setTextIfExists('cur-uv', latest.uv_index);
+
+            renderChart();
+            renderAnnualStats(todayStr);
+            loadLogs();
+
+            myChart.on('click', function (params) {
+                if (params.componentType === 'series') {
+                    const date = params.value[0];
+                    editLog(date);
+                }
+            });
+        }
+
+        let currentLogs = [];
+
+        async function loadLogs() {
+            try {
+                const response = await fetch('/api/get_logs');
+                currentLogs = await response.json();
+                const container = document.getElementById('log-container');
+                const statsEl = document.getElementById('log-stats');
+                
+                if (currentLogs.length === 0) {
+                    container.innerHTML = '<div style="text-align:center; padding:40px; color:#86868b;">暂无记录</div>';
+                    if (statsEl) statsEl.innerHTML = '';
+                    return;
+                }
+                container.innerHTML = '';
+
+                const hasText = (v) => {
+                    if (typeof v !== 'string') return false;
+                    const t = v.trim();
+                    if (!t) return false;
+                    const normalized = t.replace(/\s+/g, '');
+                    const placeholders = new Set(['无内容', '无施工内容', '无', '暂无', '暂无内容', '无施工', '无施工安排']);
+                    return !placeholders.has(normalized);
+                };
+
+                const toBrief = (log) => {
+                    const v = (log && typeof log.work_content === 'string') ? log.work_content : '';
+                    const t = v.trim();
+                    if (!t) return '无内容';
+                    const normalized = t.replace(/\s+/g, '');
+                    const placeholders = new Set(['无内容', '无施工内容', '无', '暂无', '暂无内容', '无施工', '无施工安排']);
+                    if (placeholders.has(normalized)) return '未施工';
+                    return t.length > 30 ? (t.substring(0, 30) + '...') : t;
+                };
+
+                container.innerHTML += currentLogs.map(log => `
+                    <div class="log-item" onclick="editLog('${log.date}')">
+                        <div class="log-date">${log.date}</div>
+                        <div class="log-brief">${toBrief(log)}</div>
+                    </div>
+                `).join('');
+                const worked = currentLogs.filter(l => hasText(l.work_content)).length;
+                const notWorked = Math.max(0, currentLogs.length - worked);
+                if (statsEl) {
+                    statsEl.innerHTML = `
+                        <div class="log-stats-pill">施工 ${worked} 天</div>
+                        <div class="log-stats-pill">未施工 ${notWorked} 天</div>
+                    `;
+                }
+            } catch (err) {
+                console.error('加载日志失败:', err);
+            }
+        }
+
+        function openLogModal() {
+            document.getElementById('modal-title').innerText = '编写施工日志';
+            const today = getTodayStr();
+            document.getElementById('log-date').value = today;
+            document.getElementById('log-date').disabled = false;
+            document.getElementById('log-date').max = today;
+            const deleteBtn = document.getElementById('delete-log-btn');
+            if (deleteBtn) deleteBtn.style.display = 'none';
+            
+            const weather = window.WEATHER_DATA.find(d => d.date === today) || {};
+            document.getElementById('weather-am').value = pickCode(weather.am_code, weather.condition_code, 0);
+            document.getElementById('weather-pm').value = pickCode(weather.pm_code, weather.condition_code, 0);
+
+            const hour = new Date().getHours();
+            document.getElementById('weather-am').disabled = false;
+            document.getElementById('weather-pm').disabled = hour < 12;
+
+            document.getElementById('work_content').value = '';
+            document.getElementById('personnel_machinery').value = '';
+            document.getElementById('safety_quality').value = '';
+            document.getElementById('memo').value = '';
+            document.getElementById('log-modal').style.display = 'flex';
+        }
+
+        function closeLogModal() {
+            document.getElementById('log-modal').style.display = 'none';
+        }
+
+        function updateDeleteLogButton(date) {
+            const btn = document.getElementById('delete-log-btn');
+            if (!btn) return;
+            const exists = Array.isArray(currentLogs) && currentLogs.some(l => l && l.date === date);
+            btn.style.display = exists ? 'inline-flex' : 'none';
+        }
+
+        async function deleteLog() {
+            const dateVal = document.getElementById('log-date').value;
+            if (!dateVal) { alert('请选择日期'); return; }
+            if (!confirm(`确定删除 ${dateVal} 的施工日志吗？`)) return;
+            try {
+                const res = await fetch('/api/delete_log', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date: dateVal })
+                });
+                if (res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    if (data && data.deleted === false) {
+                        alert('该日期没有可删除的日志');
+                        updateDeleteLogButton(dateVal);
+                        return;
+                    }
+                    alert('删除成功！');
+                    closeLogModal();
+                    loadLogs();
+                } else {
+                    let msg = `错误码 ${res.status}`;
+                    if (res.status === 404) {
+                        msg = '接口不存在(404)，请关闭后端并重新启动';
+                    }
+                    try {
+                        const data = await res.json();
+                        if (data && data.message) msg = data.message;
+                    } catch {}
+                    alert('删除失败：' + msg);
+                }
+            } catch (err) {
+                const msg = err && err.message ? err.message : '网络错误';
+                alert('删除失败：无法连接后端服务（' + msg + '）');
+            }
+        }
+
+        async function saveLog() {
+            const date = document.getElementById('log-date').value;
+            const todayStr = getTodayStr();
+            const logData = {
+                date: date,
+                work_content: document.getElementById('work_content').value,
+                personnel_machinery: document.getElementById('personnel_machinery').value,
+                safety_quality: document.getElementById('safety_quality').value,
+                memo: document.getElementById('memo').value
+            };
+
+            const weatherData = {
+                date: date,
+                am_code: parseInt(document.getElementById('weather-am').value),
+                pm_code: parseInt(document.getElementById('weather-pm').value)
+            };
+
+            if (!date) { alert('请选择日期'); return; }
+            if (date > todayStr) { alert('不能更改未来日期的数据'); return; }
+
+            try {
+                const weatherRes = await fetch('/api/update_weather', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(weatherData)
+                });
+
+                const logRes = await fetch('/api/save_log', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(logData)
+                });
+
+                if (weatherRes.ok && logRes.ok) {
+                    alert('保存成功！');
+                    closeLogModal();
+                    try {
+                        const fresh = await fetch('/api/get_weather');
+                        if (fresh.ok) {
+                            window.WEATHER_DATA = await fresh.json();
+                        }
+                    } catch (e) {}
+                    renderChart();
+                    renderAnnualStats(getTodayStr());
+                    loadLogs();
+                } else {
+                    const getErrText = async (res) => {
+                        if (res.status === 404) {
+                            return '接口不存在(404)，请关闭后端并重新启动';
+                        }
+                        try {
+                            const data = await res.json();
+                            return data && data.message ? data.message : `错误码 ${res.status}`;
+                        } catch {
+                            return `错误码 ${res.status}`;
+                        }
+                    };
+
+                    if (!weatherRes.ok) {
+                        const msg = await getErrText(weatherRes);
+                        alert('天气保存失败：' + msg);
+                        return;
+                    }
+                    if (!logRes.ok) {
+                        const msg = await getErrText(logRes);
+                        alert('日志保存失败：' + msg);
+                        return;
+                    }
+                    alert('保存失败：请重试');
+                }
+            } catch (err) {
+                const msg = err && err.message ? err.message : '网络错误';
+                alert('保存失败：无法连接后端服务（' + msg + '）。请确认已重新启动后端，然后按 Ctrl+F5 刷新页面。');
+            }
+        }
+
+        async function editLog(date) {
+            const todayStr = getTodayStr();
+            if (date > todayStr) { alert('不能更改未来日期的数据'); return; }
+            const log = currentLogs.find(l => l.date === date) || { date: date };
+            const weather = window.WEATHER_DATA.find(d => d.date === date) || {};
+
+            document.getElementById('modal-title').innerText = '编辑施工日志 & 天气';
+            document.getElementById('log-date').value = date;
+            document.getElementById('log-date').disabled = true; 
+            document.getElementById('log-date').max = todayStr;
+            updateDeleteLogButton(date);
+            
+            document.getElementById('weather-am').value = weather.am_code !== undefined ? weather.am_code : weather.condition_code || 0;
+            document.getElementById('weather-pm').value = weather.pm_code !== undefined ? weather.pm_code : weather.condition_code || 0;
+
+            const hour = new Date().getHours();
+            if (date === todayStr) {
+                document.getElementById('weather-am').disabled = false;
+                document.getElementById('weather-pm').disabled = hour < 12;
+            } else {
+                document.getElementById('weather-am').disabled = false;
+                document.getElementById('weather-pm').disabled = false;
+            }
+
+            document.getElementById('work_content').value = log.work_content || '';
+            document.getElementById('personnel_machinery').value = log.personnel_machinery || '';
+            document.getElementById('safety_quality').value = log.safety_quality || '';
+            document.getElementById('memo').value = log.memo || '';
+            document.getElementById('log-modal').style.display = 'flex';
+        }
+
+        function renderChart() {
+            const select = document.getElementById('month-select');
+            const selectedMonth = select.value;
+            
+            if (!window.WEATHER_DATA) return;
+            let chartData = [];
+
+            const yearMode = selectedMonth.length === 4;
+            const rangeStart = yearMode ? `${selectedMonth}-01-01` : `${selectedMonth}-01`;
+            const rangeEnd = yearMode
+                ? `${selectedMonth}-12-31`
+                : `${selectedMonth}-${new Date(selectedMonth.split('-')[0], selectedMonth.split('-')[1], 0).getDate()}`;
+
+            const toDateStr = (d) => {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+            };
+
+            const monthStartDate = new Date(rangeStart.replace(/-/g, '/'));
+            const monthEndDate = new Date(rangeEnd.replace(/-/g, '/'));
+            const displayStartDate = new Date(monthStartDate);
+            displayStartDate.setDate(monthStartDate.getDate() - monthStartDate.getDay());
+            const displayEndDate = new Date(monthEndDate);
+            displayEndDate.setDate(monthEndDate.getDate() + (6 - monthEndDate.getDay()));
+            const displayRangeStart = toDateStr(displayStartDate);
+            const displayRangeEnd = toDateStr(displayEndDate);
+
+            const byDate = new Map();
+            if (Array.isArray(window.WEATHER_DATA)) {
+                window.WEATHER_DATA.forEach(it => { if (it && it.date) byDate.set(it.date, it); });
+            }
+            chartData = [];
+            {
+                const d = new Date(displayStartDate);
+                while (d <= displayEndDate) {
+                    const dStr = toDateStr(d);
+                    const it = byDate.get(dStr);
+                    const am = it ? (it.am_code !== undefined ? Number(it.am_code) : Number(it.condition_code)) : null;
+                    const pm = it ? (it.pm_code !== undefined ? Number(it.pm_code) : Number(it.condition_code)) : null;
+                    chartData.push([dStr, am, pm]);
+                    d.setDate(d.getDate() + 1);
+                }
+            }
+
+            const backgroundData = [];
+            const cursor = new Date(displayStartDate);
+            while (cursor <= displayEndDate) {
+                backgroundData.push([toDateStr(cursor), 1]);
+                cursor.setDate(cursor.getDate() + 1);
+            }
+
+            const gridPink = 'rgba(255,105,180,0.78)';
+            const gridPinkLight = 'rgba(255,105,180,0.22)';
+            const cellW = yearMode ? 24 : 110;
+            const cellH = yearMode ? 20 : 86;
+            const padX = yearMode ? 2 : 6;
+            const padY = yearMode ? 2 : 6;
+            const innerW = cellW - padX * 2;
+            const innerH = cellH - padY * 2;
+
+            const option = {
+                tooltip: {
+                    formatter: function (p) {
+                        const dateStr = p.value[0];
+                        const info = window.WEATHER_DATA.find(d => d.date === dateStr);
+                        if (!info) return `<div style="padding:10px;"><b>${dateStr}</b><br/>无数据</div>`;
+                        const amCode = pickCode(info.am_code, info.condition_code, 0);
+                        const pmCode = pickCode(info.pm_code, info.condition_code, 0);
+                        return `<div style="padding:10px;">
+                            <b>${dateStr}</b><br/>
+                            上午: ${typeNameMap[amCode]}<br/>
+                            下午: ${typeNameMap[pmCode]}<br/>
+                            气温: ${info.temp_min}°C ~ ${info.temp_max}°C
+                        </div>`;
+                    }
+                },
+                calendar: {
+                    top: yearMode ? 30 : 50,
+                    left: 'center',
+                    cellSize: yearMode ? [24, 20] : [110, 86],
+                    orient: 'vertical',
+                    range: [displayRangeStart, displayRangeEnd],
+                    itemStyle: { borderWidth: 0, borderColor: 'transparent', color: 'transparent' },
+                    splitLine: { show: false },
+                    yearLabel: { show: false },
+                    monthLabel: { 
+                        show: false
+                    },
+                    dayLabel: { 
+                        nameMap: ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'], 
+                        color: '#1d1d1f',
+                        firstDay: 0,
+                        fontSize: yearMode ? 14 : 18,
+                        fontWeight: 'bold',
+                        margin: yearMode ? 10 : 15,
+                        position: 'start'
+                    }
+                },
+                series: [
+                    {
+                        type: 'heatmap',
+                        coordinateSystem: 'calendar',
+                        data: backgroundData,
+                        itemStyle: { color: 'transparent' },
+                        z: 1
+                    },
+                    {
+                        type: 'custom',
+                        coordinateSystem: 'calendar',
+                        renderItem: function (params, api) {
+                            const dateVal = api.value(0);
+                            const cellPos = api.coord(dateVal);
+                            
+                            if (!cellPos || isNaN(cellPos[0]) || isNaN(cellPos[1])) return;
+
+                            // 使用固定尺寸更安全
+                            const width = innerW;
+                            const height = innerH;
+                            const x = cellPos[0] - width / 2;
+                            const y = cellPos[1] - height / 2;
+
+                            const rawAm = api.value(1);
+                            const rawPm = api.value(2);
+                            const amCode = (rawAm === null || rawAm === undefined || isNaN(Number(rawAm))) ? null : Number(rawAm);
+                            const pmCode = (rawPm === null || rawPm === undefined || isNaN(Number(rawPm))) ? null : Number(rawPm);
+                            // 鲁棒的日期提取
+                            let dateNum = "";
+                            try {
+                                const dStr = api.value(0).toString();
+                                if (dStr.indexOf('-') !== -1) {
+                                    dateNum = dStr.split('-')[2];
+                                } else {
+                                    const d = new Date(dateVal);
+                                    dateNum = d.getDate();
+                                }
+                            } catch(e) { dateNum = "?"; }
+                            
+                            const slotHeight = height / 2;
+                            const placeholderFill = '#eaeef3';
+                            const placeholderText = 'rgba(0,0,0,0.45)';
+                            const getColor = (code) => (code === null ? placeholderFill : (typeColorMap[code] || '#8e8e93'));
+                            const isLight = (code) => (code === null ? false : (code === 0 || code === 5 || code === 7));
+                            
+                            // 综合判断背景明度
+                            const amLight = isLight(amCode);
+                            const pmLight = isLight(pmCode);
+
+                            const children = [
+                                    {
+                                        type: 'rect',
+                                        shape: { x: x, y: y, width: width, height: slotHeight },
+                                        style: { fill: getColor(amCode) }
+                                    },
+                                    {
+                                        type: 'rect',
+                                        shape: { x: x, y: y + slotHeight, width: width, height: slotHeight },
+                                        style: { fill: getColor(pmCode) }
+                                    },
+                                    {
+                                        type: 'line',
+                                        shape: { x1: x, y1: y + slotHeight, x2: x + width, y2: y + slotHeight },
+                                        style: { stroke: 'rgba(255,255,255,0.98)', lineWidth: 3, shadowBlur: 2, shadowColor: 'rgba(0,0,0,0.25)' }
+                                    },
+                                    {
+                                        type: 'rect',
+                                        shape: { x: x, y: y, width: width, height: height },
+                                        style: { fill: 'transparent', stroke: gridPink, lineWidth: 2 }
+                                    }
+                                ];
+
+                            if (!yearMode) {
+                                children.push(
+                                    {
+                                        type: 'text',
+                                        style: (function() {
+                                            const styleBase = {
+                                                text: dateNum,
+                                                x: cellPos[0],
+                                                y: y + 18,
+                                                textAlign: 'center',
+                                                textVerticalAlign: 'middle',
+                                                fontSize: 16,
+                                                fontWeight: 'bold',
+                                                fontFamily: 'Microsoft YaHei, Arial, sans-serif'
+                                            };
+                                            if (pmCode === null) {
+                                                styleBase.fill = 'rgba(0,0,0,0.6)';
+                                            } else {
+                                                styleBase.fill = pmLight ? '#1d1d1f' : '#fff';
+                                                styleBase.textShadowBlur = pmLight ? 0 : 4;
+                                                styleBase.textShadowColor = 'rgba(0,0,0,0.5)';
+                                            }
+                                            return styleBase;
+                                        })()
+                                    },
+                                    {
+                                        type: 'text',
+                                        style: {
+                                            text: '上午',
+                                            x: x + 4,
+                                            y: y + slotHeight / 2,
+                                            textVerticalAlign: 'middle',
+                                            fill: amCode === null ? placeholderText : (amLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)'),
+                                            stroke: amCode === null ? 'rgba(255,255,255,0.0)' : 'rgba(0,0,0,0.25)',
+                                            lineWidth: amCode === null ? 0 : 2,
+                                            fontSize: 12,
+                                            fontWeight: 'bold',
+                                            fontFamily: 'Microsoft YaHei, Arial, sans-serif'
+                                        }
+                                    },
+                                    {
+                                        type: 'text',
+                                        style: {
+                                            text: '下午',
+                                            x: x + 4,
+                                            y: y + slotHeight + slotHeight / 2,
+                                            textVerticalAlign: 'middle',
+                                            fill: pmCode === null ? placeholderText : (pmLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.9)'),
+                                            stroke: pmCode === null ? 'rgba(255,255,255,0.0)' : 'rgba(0,0,0,0.25)',
+                                            lineWidth: pmCode === null ? 0 : 2,
+                                            fontSize: 12,
+                                            fontWeight: 'bold',
+                                            fontFamily: 'Microsoft YaHei, Arial, sans-serif'
+                                        }
+                                    },
+                                );
+                            }
+
+                            return { type: 'group', children };
+                        },
+                        data: chartData,
+                        z: 10
+                    }
+                ]
+            };
+            
+            try {
+                myChart.setOption(option, true);
+                if (!yearMode) {
+                    const dayMs = 24 * 60 * 60 * 1000;
+                    const totalDays = Math.floor((displayEndDate.getTime() - displayStartDate.getTime()) / dayMs) + 1;
+                    const rows = Math.max(1, Math.floor(totalDays / 7));
+
+                    const d0 = new Date(displayStartDate);
+                    const d6 = new Date(displayStartDate);
+                    d6.setDate(d0.getDate() + 6);
+                    const firstRowStart = displayRangeStart;
+                    const firstRowEnd = toDateStr(d6);
+
+                    const pStart = myChart.convertToPixel({ calendarIndex: 0 }, firstRowStart);
+                    const pEndTopRow = myChart.convertToPixel({ calendarIndex: 0 }, firstRowEnd);
+                    const pLast = myChart.convertToPixel({ calendarIndex: 0 }, displayRangeEnd);
+
+                    if (pStart && pEndTopRow && pLast && !isNaN(pStart[0]) && !isNaN(pStart[1]) && !isNaN(pEndTopRow[0]) && !isNaN(pEndTopRow[1]) && !isNaN(pLast[0]) && !isNaN(pLast[1])) {
+                        const frameStroke = 'rgba(0,0,0,0.88)';
+                        const frameW = 4;
+                        const gridW = 3;
+                        const headerHeight = 40;
+
+                        const xLeft = pStart[0] - cellW / 2;
+                        const xRight = pEndTopRow[0] + cellW / 2;
+                        const yTop = pStart[1] - cellH / 2;
+                        const yBottom = pLast[1] + cellH / 2;
+                        const yHeaderTop = yTop - headerHeight;
+
+                        const children = [
+                            {
+                                type: 'rect',
+                                shape: { x: xLeft, y: yHeaderTop, width: xRight - xLeft, height: yBottom - yHeaderTop },
+                                style: { fill: 'rgba(255,255,255,0.0)', stroke: frameStroke, lineWidth: frameW }
+                            },
+                            {
+                                type: 'line',
+                                shape: { x1: xLeft, y1: yTop, x2: xRight, y2: yTop },
+                                style: { stroke: frameStroke, lineWidth: gridW }
+                            }
+                        ];
+
+                        for (let i = 1; i <= 6; i++) {
+                            const x = xLeft + i * cellW;
+                            children.push({
+                                type: 'line',
+                                shape: { x1: x, y1: yHeaderTop, x2: x, y2: yBottom },
+                                style: { stroke: frameStroke, lineWidth: gridW }
+                            });
+                        }
+
+                        for (let r = 1; r < rows; r++) {
+                            const y = yTop + r * cellH;
+                            children.push({
+                                type: 'line',
+                                shape: { x1: xLeft, y1: y, x2: xRight, y2: y },
+                                style: { stroke: frameStroke, lineWidth: gridW }
+                            });
+                        }
+
+                        myChart.setOption({
+                            graphic: [
+                                { id: 'weekday-grid', type: 'group', silent: true, children: [] },
+                                {
+                                    id: 'calendar-frame',
+                                    type: 'group',
+                                    silent: true,
+                                    z: 180,
+                                    children
+                                }
+                            ]
+                        });
+                    }
+                } else {
+                    myChart.setOption({
+                        graphic: [
+                            {
+                                id: 'weekday-grid',
+                                type: 'group',
+                                silent: true,
+                                children: []
+                            },
+                            {
+                                id: 'calendar-frame',
+                                type: 'group',
+                                silent: true,
+                                children: []
+                            }
+                        ]
+                    });
+                }
+            } catch (err) {
+                console.error("setOption 失败: ", err);
+            }
+        }
+
+        async function refreshData(btnEl) {
+            const btn = btnEl || document.querySelector('.apple-btn');
+            btn.innerText = '同步中...';
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/sync_weather', { method: 'POST' });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    try {
+                        const fresh = await fetch('/api/get_weather');
+                        if (fresh.ok) {
+                            window.WEATHER_DATA = await fresh.json();
+                        }
+                    } catch (e) {}
+                    renderChart();
+                    renderAnnualStats(getTodayStr());
+                    alert('同步成功（' + (result.source || '数据源') + '），日历已更新。');
+                } else if (result.status === 'offline') {
+                    try {
+                        const fresh = await fetch('/api/get_weather');
+                        if (fresh.ok) {
+                            window.WEATHER_DATA = await fresh.json();
+                        }
+                    } catch (e) {}
+                    renderChart();
+                    renderAnnualStats(getTodayStr());
+                    alert('外网受限，未能同步最新天气（' + (result.message || 'wttr 不可用') + '）。可继续手动编辑。');
+                } else {
+                    alert((result && result.message) ? ('同步失败：' + result.message) : '同步失败：请检查网络');
+                }
+            } catch (err) {
+                const msg = err && err.message ? err.message : '网络错误';
+                alert('同步失败：无法连接后端服务（' + msg + '）');
+            } finally {
+                btn.innerText = '刷新同步';
+                btn.disabled = false;
+            }
+        }
+
+        async function openProgressImage(fileName) {
+            const name = fileName || '清表施工进度图.jpg';
+            const url = encodeURI('/' + name);
+            try {
+                const res = await fetch(url, { method: 'HEAD' });
+                if (!res.ok) {
+                    alert('未找到图片文件：' + name);
+                    return;
+                }
+            } catch (e) {}
+            window.open(url, '_blank');
+        }
+
+        window.onload = initDashboard;
+        window.onresize = () => {
+            myChart.resize();
+            renderChart();
+        };
+    </script>
+</body>
+</html>

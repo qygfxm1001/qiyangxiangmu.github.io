@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>清表施工进度图</title>
+    <style>
+        :root {
+            --apple-blue: #007AFF;
+            --glass-bg: rgba(255, 255, 255, 0.75);
+            --glass-border: rgba(255, 255, 255, 0.35);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+            font-size: 20px;
+            line-height: 1.3;
+            margin: 0;
+            padding: 14px;
+            background: linear-gradient(180deg, #74b9ff 0%, #a29bfe 100%);
+            background-attachment: fixed;
+            height: 100vh;
+            overflow: hidden;
+            color: #1d1d1f;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+        }
+
+        .header {
+            padding: 16px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .title {
+            font-size: 30px;
+            font-weight: 900;
+            letter-spacing: 4px;
+            color: var(--apple-blue);
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            background: var(--apple-blue);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .btn.secondary {
+            background: rgba(0,0,0,0.06);
+            color: #1d1d1f;
+        }
+
+        .select {
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(0,0,0,0.12);
+            background: rgba(255,255,255,0.9);
+            font-size: 16px;
+            font-weight: 800;
+            color: #1d1d1f;
+        }
+
+        .card {
+            margin-top: 14px;
+            padding: 14px;
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .day-bar {
+            display: flex;
+            gap: 8px;
+            padding: 10px;
+            margin-bottom: 12px;
+            border-radius: 16px;
+            border: 1px solid rgba(0,0,0,0.10);
+            background: rgba(255,255,255,0.55);
+            overflow-x: auto;
+        }
+
+        .day-btn {
+            border: 1px solid rgba(0,0,0,0.12);
+            background: rgba(255,255,255,0.85);
+            color: #1d1d1f;
+            border-radius: 14px;
+            padding: 8px 12px;
+            font-size: 16px;
+            font-weight: 900;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .day-btn.active {
+            background: var(--apple-blue);
+            color: white;
+            border-color: rgba(0,0,0,0.10);
+        }
+
+        .editor-actions {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+            align-items: center;
+        }
+
+        .editor-title {
+            font-size: 18px;
+            font-weight: 900;
+            color: rgba(29,29,31,0.78);
+            letter-spacing: 1px;
+        }
+
+        .grid-wrap {
+            overflow: auto;
+            border-radius: 16px;
+            border: 1px solid rgba(0,0,0,0.10);
+            background: rgba(255,255,255,0.55);
+            flex: 1;
+            min-height: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 8px;
+            min-width: 980px;
+        }
+
+        th, td {
+            background: rgba(255,255,255,0.85);
+            border: 1px solid rgba(0,0,0,0.12);
+            border-radius: 12px;
+            padding: 10px 8px;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            font-weight: 900;
+            background: rgba(255,255,255,0.95);
+        }
+
+        th.sticky-left, td.sticky-left {
+            position: sticky;
+            left: 0;
+            z-index: 6;
+        }
+
+        td.sticky-left {
+            font-weight: 900;
+            background: rgba(255,255,255,0.95);
+        }
+
+        tfoot td {
+            position: sticky;
+            bottom: 0;
+            z-index: 7;
+            background: rgba(255,255,255,0.96);
+            box-shadow: 0 -10px 22px rgba(0,0,0,0.12);
+        }
+
+        tfoot td.sticky-left {
+            z-index: 8;
+        }
+
+        .inp {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(0,0,0,0.12);
+            font-size: 16px;
+            font-weight: 900;
+            box-sizing: border-box;
+            background: rgba(255,255,255,0.92);
+        }
+
+        .percent-cell {
+            font-weight: 900;
+            color: #ff1b1b;
+        }
+
+        .footer {
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            color: rgba(29,29,31,0.72);
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="glass header">
+            <div class="title">清表施工进度图</div>
+            <div class="controls">
+                <select id="month" class="select"></select>
+                <button class="btn" onclick="reload()">刷新</button>
+                <a class="btn secondary" href="/index.html">返回主页</a>
+            </div>
+        </div>
+
+        <div class="glass card">
+            <div id="day-bar" class="day-bar"></div>
+            <div class="editor-actions">
+                <div class="editor-title" id="editor-title">当日进度</div>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;">
+                    <button class="btn" onclick="saveAll()">保存当日数据</button>
+                    <button class="btn secondary" onclick="reload()">重新加载</button>
+                </div>
+            </div>
+            <div class="grid-wrap">
+                <table id="editor"></table>
+            </div>
+            <div class="footer">
+                <div>方阵：1 - 22</div>
+                <div id="status">未加载</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const PROGRESS_TYPE = 'clear';
+        const SQUAD_MIN = 1;
+        const SQUAD_MAX = 22;
+
+        let monthStr = '';
+        let monthDays = 0;
+        let dataMap = new Map();
+        let squadAreaMap = new Map();
+        let selectedDateStr = '';
+
+        function pad2(n) { return String(n).padStart(2, '0'); }
+        function toDateStr(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+        function monthLastDay(year, month) { return new Date(year, month, 0).getDate(); }
+
+        function setStatus(text) {
+            const el = document.getElementById('status');
+            if (el) el.textContent = text;
+        }
+
+        function buildMonthOptions() {
+            const select = document.getElementById('month');
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = now.getMonth() + 1;
+            const cur = `${y}-${pad2(m)}`;
+            const months = [];
+            for (let i = -6; i <= 6; i++) {
+                const d = new Date(y, m - 1 + i, 1);
+                months.push(`${d.getFullYear()}-${pad2(d.getMonth() + 1)}`);
+            }
+            select.innerHTML = months.map(v => `<option value="${v}">${v}</option>`).join('');
+            select.value = cur;
+            select.onchange = () => reload();
+        }
+
+        function keyOf(squad, dateStr) { return `${squad}|${dateStr}`; }
+        function areaKey(squad) { return String(squad); }
+
+        function parseMonth() {
+            const select = document.getElementById('month');
+            monthStr = select.value;
+            const parts = monthStr.split('-');
+            const year = Number(parts[0]);
+            const month = Number(parts[1]);
+            monthDays = monthLastDay(year, month);
+            return { year, month };
+        }
+
+        function parseNullableNumber(s) {
+            if (s === null || s === undefined) return null;
+            const t = String(s).trim();
+            if (!t) return null;
+            const v = Number(t);
+            return isNaN(v) ? null : v;
+        }
+
+        function formatNumber(v) {
+            if (!(typeof v === 'number') || isNaN(v)) return '';
+            const s = v.toFixed(2);
+            return s.replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+        }
+
+        function escapeAttr(s) {
+            const t = s === null || s === undefined ? '' : String(s);
+            return t
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function computePercent(area, cumulative) {
+            if (!(typeof area === 'number') || isNaN(area) || area <= 0) return null;
+            if (!(typeof cumulative === 'number') || isNaN(cumulative)) return null;
+            return Math.max(0, Math.min(100, (cumulative / area) * 100));
+        }
+
+        function getCumulativeFromDaily(squad, dateStr, dailyVal) {
+            if (!dateStr || dateStr.length < 10) return null;
+            const parts = dateStr.split('-');
+            const year = Number(parts[0]);
+            const month = Number(parts[1]);
+            const day = Number(parts[2]);
+            if (!year || !month || !day) return null;
+
+            let base = 0;
+            let hasAny = false;
+            for (let d = 1; d < day; d++) {
+                const ds = `${year}-${pad2(month)}-${pad2(d)}`;
+                const rec = dataMap.get(keyOf(squad, ds));
+                if (!rec) continue;
+                const daily = rec.daily_qty;
+                if (typeof daily === 'number' && !isNaN(daily)) {
+                    base += daily;
+                    hasAny = true;
+                }
+            }
+            const today = (typeof dailyVal === 'number' && !isNaN(dailyVal)) ? dailyVal : 0;
+            const total = base + today;
+            if (!hasAny && !(typeof dailyVal === 'number' && !isNaN(dailyVal))) return null;
+            return total;
+        }
+
+        function buildDayBar() {
+            const bar = document.getElementById('day-bar');
+            const { year, month } = parseMonth();
+            const days = Array.from({ length: monthDays }, (_, i) => i + 1);
+            bar.innerHTML = days.map(d => {
+                const ds = `${year}-${pad2(month)}-${pad2(d)}`;
+                const active = ds === selectedDateStr ? 'active' : '';
+                return `<button class="day-btn ${active}" onclick="selectDay(${d})">${d}日</button>`;
+            }).join('');
+        }
+
+        function selectDay(day) {
+            const { year, month } = parseMonth();
+            selectedDateStr = `${year}-${pad2(month)}-${pad2(day)}`;
+            const title = document.getElementById('editor-title');
+            if (title) title.textContent = `当日进度 · ${selectedDateStr}`;
+            buildDayBar();
+            buildEditor();
+        }
+
+        function buildEditor() {
+            const table = document.getElementById('editor');
+            const head = `
+                <thead><tr>
+                    <th class="sticky-left">方阵</th>
+                    <th>面积（亩）</th>
+                    <th>当天完成（亩）</th>
+                    <th>累计完成（亩）</th>
+                    <th>完成%</th>
+                    <th>备注</th>
+                </tr></thead>
+            `;
+            const rows = [];
+            for (let squad = SQUAD_MIN; squad <= SQUAD_MAX; squad++) {
+                const areaMu = squadAreaMap.get(areaKey(squad));
+                const rec = dataMap.get(keyOf(squad, selectedDateStr)) || {};
+                const dailyRaw = rec.daily_qty === null || rec.daily_qty === undefined ? '' : String(rec.daily_qty);
+                const memoRaw = rec.memo === null || rec.memo === undefined ? '' : String(rec.memo);
+
+                const dailyVal = parseNullableNumber(dailyRaw);
+                const cumulativeVal = getCumulativeFromDaily(squad, selectedDateStr, dailyVal);
+                const pct = computePercent((typeof areaMu === 'number' ? areaMu : null), cumulativeVal);
+                const cumulativeDisplayStr = cumulativeVal === null ? '' : formatNumber(cumulativeVal);
+
+                rows.push(`
+                    <tr>
+                        <td class="sticky-left">#${squad}</td>
+                        <td><input class="inp" data-squad="${squad}" data-field="area" type="number" step="0.01" value="${areaMu === undefined ? '' : (areaMu === null ? '' : areaMu)}" placeholder="例如：23"></td>
+                        <td><input class="inp" data-squad="${squad}" data-field="daily" type="number" step="0.01" value="${dailyRaw}" placeholder="例如：3"></td>
+                        <td><input class="inp" data-squad="${squad}" data-field="cumulative" type="text" value="${cumulativeDisplayStr}" placeholder="自动累计" disabled></td>
+                        <td class="percent-cell" id="pct-${squad}">${pct === null ? '—' : pct.toFixed(1) + '%'}</td>
+                        <td><input class="inp" data-squad="${squad}" data-field="memo" type="text" value="${escapeAttr(memoRaw)}" placeholder="备注"></td>
+                    </tr>
+                `);
+            }
+            const totalRow = `
+                <tfoot><tr>
+                    <td class="sticky-left">合计</td>
+                    <td><span class="percent-cell" id="total-area">—</span></td>
+                    <td><span class="percent-cell" id="total-daily">—</span></td>
+                    <td><span class="percent-cell" id="total-cumulative">—</span></td>
+                    <td><span class="percent-cell" id="total-percent">—</span></td>
+                    <td></td>
+                </tr></tfoot>
+            `;
+            table.innerHTML = head + `<tbody>${rows.join('')}</tbody>` + totalRow;
+
+            const updateTotals = () => {
+                let sumArea = 0;
+                let sumDaily = 0;
+                let sumCum = 0;
+                let hasArea = false;
+                let hasDaily = false;
+                let hasCum = false;
+
+                for (let squad = SQUAD_MIN; squad <= SQUAD_MAX; squad++) {
+                    const areaEl = table.querySelector(`input[data-squad="${squad}"][data-field="area"]`);
+                    const dailyEl = table.querySelector(`input[data-squad="${squad}"][data-field="daily"]`);
+                    const cumEl = table.querySelector(`input[data-squad="${squad}"][data-field="cumulative"]`);
+
+                    const area = parseNullableNumber(areaEl ? areaEl.value : '');
+                    const daily = parseNullableNumber(dailyEl ? dailyEl.value : '');
+                    const cumulative = parseNullableNumber(cumEl ? cumEl.value : '');
+
+                    if (typeof area === 'number') { sumArea += area; hasArea = true; }
+                    if (typeof daily === 'number') { sumDaily += daily; hasDaily = true; }
+                    if (typeof cumulative === 'number') { sumCum += cumulative; hasCum = true; }
+                }
+
+                const totalAreaEl = document.getElementById('total-area');
+                const totalDailyEl = document.getElementById('total-daily');
+                const totalCumEl = document.getElementById('total-cumulative');
+                const totalPctEl = document.getElementById('total-percent');
+
+                if (totalAreaEl) totalAreaEl.textContent = hasArea ? (formatNumber(sumArea) + ' 亩') : '—';
+                if (totalDailyEl) totalDailyEl.textContent = hasDaily ? (formatNumber(sumDaily) + ' 亩') : '—';
+                if (totalCumEl) totalCumEl.textContent = hasCum ? (formatNumber(sumCum) + ' 亩') : '—';
+
+                const pct = computePercent(sumArea, sumCum);
+                if (totalPctEl) totalPctEl.textContent = (hasArea && hasCum && pct !== null) ? (pct.toFixed(1) + '%') : '—';
+            };
+
+            table.oninput = (e) => {
+                const target = e.target;
+                if (!target || !target.dataset) return;
+                const squad = Number(target.dataset.squad);
+                if (!squad) return;
+                const areaEl = table.querySelector(`input[data-squad="${squad}"][data-field="area"]`);
+                const dailyEl = table.querySelector(`input[data-squad="${squad}"][data-field="daily"]`);
+                const cumEl = table.querySelector(`input[data-squad="${squad}"][data-field="cumulative"]`);
+
+                const area = parseNullableNumber(areaEl ? areaEl.value : '');
+                const dailyVal = parseNullableNumber(dailyEl ? dailyEl.value : '');
+                const cumulativeVal = getCumulativeFromDaily(squad, selectedDateStr, dailyVal);
+                if (cumEl) cumEl.value = cumulativeVal === null ? '' : formatNumber(cumulativeVal);
+
+                const pct = computePercent(area, cumulativeVal);
+                const pctEl = document.getElementById(`pct-${squad}`);
+                if (pctEl) pctEl.textContent = pct === null ? '—' : (pct.toFixed(1) + '%');
+                updateTotals();
+            };
+
+            updateTotals();
+        }
+
+        async function loadSquads() {
+            setStatus('加载中...');
+            try {
+                const res = await fetch(`/api/get_progress_squads?type=${encodeURIComponent(PROGRESS_TYPE)}`);
+                if (!res.ok) {
+                    squadAreaMap = new Map();
+                    return;
+                }
+                const rows = await res.json();
+                squadAreaMap = new Map();
+                (rows || []).forEach(r => {
+                    if (!r) return;
+                    const squad = Number(r.squad);
+                    const area = (r.area_mu === null || r.area_mu === undefined || r.area_mu === '') ? null : Number(r.area_mu);
+                    if (!isNaN(squad) && typeof area === 'number' && !isNaN(area)) {
+                        squadAreaMap.set(areaKey(squad), area);
+                    }
+                });
+            } catch (e) {
+                squadAreaMap = new Map();
+            }
+        }
+
+        async function loadData() {
+            const { year, month } = parseMonth();
+            const monthParam = `${year}-${pad2(month)}`;
+            setStatus('加载中...');
+            try {
+                const res = await fetch(`/api/get_progress?type=${encodeURIComponent(PROGRESS_TYPE)}&month=${encodeURIComponent(monthParam)}`);
+                if (!res.ok) {
+                    setStatus(`加载失败：${res.status}`);
+                    return;
+                }
+                const rows = await res.json();
+                dataMap = new Map();
+                (rows || []).forEach(r => {
+                    if (!r || !r.date) return;
+                    const k = keyOf(Number(r.squad), r.date);
+                    dataMap.set(k, r);
+                });
+                setStatus(`已加载：${monthParam}`);
+            } catch (e) {
+                setStatus('加载失败：无法连接后端服务');
+            }
+        }
+
+        async function saveAll() {
+            if (!selectedDateStr) return;
+            const table = document.getElementById('editor');
+            if (!table) return;
+
+            const areaPayloads = [];
+            const progressPayloads = [];
+
+            for (let squad = SQUAD_MIN; squad <= SQUAD_MAX; squad++) {
+                const areaEl = table.querySelector(`input[data-squad="${squad}"][data-field="area"]`);
+                const dailyEl = table.querySelector(`input[data-squad="${squad}"][data-field="daily"]`);
+                const memoEl = table.querySelector(`input[data-squad="${squad}"][data-field="memo"]`);
+
+                const areaVal = parseNullableNumber(areaEl ? areaEl.value : '');
+                const prevArea = squadAreaMap.get(areaKey(squad));
+                const prevAreaNum = (typeof prevArea === 'number' && !isNaN(prevArea)) ? prevArea : null;
+                if (areaVal !== prevAreaNum) {
+                    areaPayloads.push({ type: PROGRESS_TYPE, squad, area_mu: areaVal });
+                }
+
+                const dailyVal = parseNullableNumber(dailyEl ? dailyEl.value : '');
+                const cumVal = getCumulativeFromDaily(squad, selectedDateStr, dailyVal);
+                const memoVal = (memoEl && memoEl.value !== undefined) ? String(memoEl.value) : '';
+                const prev = dataMap.get(keyOf(squad, selectedDateStr));
+                const prevDaily = prev && prev.daily_qty !== undefined ? prev.daily_qty : null;
+                const prevCum = prev && prev.cumulative_qty !== undefined ? prev.cumulative_qty : null;
+                const prevMemo = prev && prev.memo !== undefined ? prev.memo : '';
+                const prevDailyNum = (typeof prevDaily === 'number' && !isNaN(prevDaily)) ? prevDaily : null;
+                const prevCumNum = (typeof prevCum === 'number' && !isNaN(prevCum)) ? prevCum : null;
+                const prevMemoStr = prevMemo === null || prevMemo === undefined ? '' : String(prevMemo);
+
+                const changed = (dailyVal !== prevDailyNum) || (cumVal !== prevCumNum) || (memoVal !== prevMemoStr);
+                const shouldSave = changed && (dailyVal !== null || cumVal !== null || memoVal.trim() !== '' || !!prev);
+                if (shouldSave) {
+                    progressPayloads.push({ type: PROGRESS_TYPE, squad, date: selectedDateStr, daily_qty: dailyVal, cumulative_qty: cumVal, memo: memoVal });
+                }
+            }
+
+            try {
+                for (const p of areaPayloads) {
+                    const resArea = await fetch('/api/save_progress_squad', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(p)
+                    });
+                    if (!resArea.ok) {
+                        alert('面积保存失败：' + resArea.status);
+                        return;
+                    }
+                    if (p.area_mu === null) squadAreaMap.delete(areaKey(p.squad));
+                    else squadAreaMap.set(areaKey(p.squad), p.area_mu);
+                }
+
+                if (progressPayloads.length > 0) {
+                    const res = await fetch('/api/save_progress', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(progressPayloads)
+                    });
+                    if (!res.ok) {
+                        alert('保存失败：' + res.status);
+                        return;
+                    }
+                    progressPayloads.forEach(p => {
+                        const k = keyOf(p.squad, p.date);
+                        dataMap.set(k, { squad: p.squad, date: p.date, daily_qty: p.daily_qty, cumulative_qty: p.cumulative_qty, memo: p.memo });
+                    });
+                }
+
+                setStatus(`已保存：${selectedDateStr}`);
+                buildEditor();
+            } catch (e) {
+                alert('保存失败：无法连接后端服务');
+            }
+        }
+
+        async function reload() {
+            await loadSquads();
+            await loadData();
+            const { year, month } = parseMonth();
+            const today = new Date();
+            const monthParam = `${year}-${pad2(month)}`;
+            const todayParam = `${today.getFullYear()}-${pad2(today.getMonth() + 1)}`;
+            const day = monthParam === todayParam ? today.getDate() : 1;
+            selectedDateStr = `${year}-${pad2(month)}-${pad2(day)}`;
+            const title = document.getElementById('editor-title');
+            if (title) title.textContent = `当日进度 · ${selectedDateStr}`;
+            buildDayBar();
+            buildEditor();
+        }
+
+        buildMonthOptions();
+        reload();
+    </script>
+</body>
+</html>
