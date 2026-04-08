@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>祁阳项目 - 实时晴雨表 (Apple 升级版)</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
@@ -319,9 +320,9 @@
                 <div class="glass-card">
                     <h3 style="margin-top:0; text-align:center; color: var(--apple-blue); font-size: 26px; font-weight: 900;">光伏区施工进度</h3>
                     <div class="progress-links">
-                        <button class="apple-btn apple-btn-secondary progress-btn" onclick="openProgressImage('清表施工进度图.html')">清表施工进度图</button>
-                        <button class="apple-btn apple-btn-secondary progress-btn" onclick="openProgressImage('钻孔施工进度图.html')">钻孔施工进度图</button>
-                        <button class="apple-btn apple-btn-secondary progress-btn" onclick="openProgressImage('浇桩施工进度图.html')">浇桩施工进度图</button>
+                        <button class="apple-btn apple-btn-secondary progress-btn" onclick="openProgressPage('清表施工进度图.html')">清表施工进度图</button>
+                        <button class="apple-btn apple-btn-secondary progress-btn" onclick="openProgressPage('钻孔施工进度图.html')">钻孔施工进度图</button>
+                        <button class="apple-btn apple-btn-secondary progress-btn" onclick="openProgressPage('浇桩施工进度图.html')">浇桩施工进度图</button>
                         <button class="apple-btn apple-btn-secondary progress-btn" onclick="openProgressImage('支架安装施工进度图.jpg')">支架安装施工进度图</button>
                         <button class="apple-btn apple-btn-secondary progress-btn" onclick="openProgressImage('组件施工安装进度图.jpg')">组件施工安装进度图</button>
                     </div>
@@ -1238,17 +1239,16 @@
             }
         }
 
-        async function openProgressImage(fileName) {
+        function openProgressPage(fileName) {
+            const name = fileName || '清表施工进度图.html';
+            const url = encodeURI(name);
+            window.location.assign(url);
+        }
+
+        function openProgressImage(fileName) {
             const name = fileName || '清表施工进度图.jpg';
             const url = encodeURI(name);
-            try {
-                const res = await fetch(url, { method: 'HEAD' });
-                if (!res.ok) {
-                    alert('未找到图片文件：' + name);
-                    return;
-                }
-            } catch (e) {}
-            window.open(url, '_blank');
+            window.location.assign(url);
         }
 
         window.onload = initDashboard;
