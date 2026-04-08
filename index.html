@@ -368,6 +368,10 @@
                     <div class="log-list" id="log-container">
                         <div style="text-align:center; padding:40px; color:#86868b;">暂无记录</div>
                     </div>
+                    <div style="display:flex; justify-content: space-between; align-items:center; gap: 10px; margin-top: 12px;">
+                        <div id="auth-badge" style="font-size: 14px; font-weight: 900; color: rgba(29,29,31,0.72);">未登录</div>
+                        <button class="apple-btn apple-btn-secondary" style="padding: 8px 12px; font-size: 14px;" onclick="switchAuth()">切换账号</button>
+                    </div>
                     <button class="apple-btn" style="width:100%; margin-top:20px;" onclick="openLogModal()">+ 编写今日日志</button>
                     <div id="log-stats" class="log-stats"></div>
                 </div>
@@ -418,12 +422,146 @@
         </div>
     </div>
 
+    <div class="modal-mask" id="auth-modal">
+        <div class="modal-content" style="width: 440px; max-width: calc(100vw - 32px);">
+            <h3 style="margin-top:0;">进入系统</h3>
+            <div class="form-group">
+                <label>请输入 11 位手机号（1 开头）</label>
+                <input id="auth-phone" type="tel" inputmode="numeric" maxlength="11" placeholder="例如：13800138000">
+            </div>
+            <div id="auth-tip" style="font-size: 14px; font-weight: 800; color: rgba(29,29,31,0.62);"></div>
+            <div style="display:flex; justify-content:flex-end; gap: 10px; margin-top: 16px;">
+                <button class="apple-btn" onclick="submitAuth()">进入</button>
+            </div>
+        </div>
+    </div>
+
     <script src="config.js"></script>
     <script src="weather_data.js?v=1.1"></script>
     <script>
         let myChart = echarts.init(document.getElementById('barometer-chart'));
         const API_BASE = (window.API_BASE || '').replace(/\/$/, '');
         const api = (path) => API_BASE + path;
+
+        const AUTH_STORAGE_KEY = 'qy_auth_v1';
+        let AUTH_ROLE = 'guest';
+        let AUTH_PHONE = '';
+
+        function getAdminPhones() {
+            const v = window.ADMIN_PHONES;
+            if (Array.isArray(v)) return v.map(s => String(s || '').trim()).filter(Boolean);
+            const single = (window.ADMIN_PHONE || '').trim();
+            return single ? [single] : [];
+        }
+
+        function normalizeDigits(s) {
+            return (s || '').toString().replace(/\D/g, '');
+        }
+
+        function isValidPhone(s) {
+            return /^1\d{10}$/.test(s);
+        }
+
+        function setAuthBadge() {
+            const el = document.getElementById('auth-badge');
+            if (!el) return;
+            const roleText = AUTH_ROLE === 'admin' ? '管理员' : '游客';
+            el.textContent = `${roleText}：${AUTH_PHONE || '未登录'}`;
+        }
+
+        function applyRoleUi() {
+            setAuthBadge();
+            const writeBtn = document.querySelector('button[onclick="openLogModal()"]');
+            if (writeBtn) {
+                writeBtn.disabled = AUTH_ROLE !== 'admin';
+                writeBtn.style.opacity = AUTH_ROLE === 'admin' ? '1' : '0.55';
+            }
+        }
+
+        function readAuthFromStorage() {
+            try {
+                const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+                if (!raw) return null;
+                const obj = JSON.parse(raw);
+                if (!obj || !isValidPhone(obj.phone)) return null;
+                const role = obj.role === 'admin' ? 'admin' : 'guest';
+                return { role, phone: obj.phone };
+            } catch {
+                return null;
+            }
+        }
+
+        function writeAuthToStorage(role, phone) {
+            const payload = { role: role === 'admin' ? 'admin' : 'guest', phone };
+            localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(payload));
+        }
+
+        function showAuthModal(text) {
+            const modal = document.getElementById('auth-modal');
+            const tip = document.getElementById('auth-tip');
+            const input = document.getElementById('auth-phone');
+            if (tip) tip.textContent = text || '';
+            if (modal) modal.style.display = 'flex';
+            if (input) {
+                input.value = '';
+                setTimeout(() => input.focus(), 50);
+            }
+        }
+
+        function hideAuthModal() {
+            const modal = document.getElementById('auth-modal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function submitAuth() {
+            const input = document.getElementById('auth-phone');
+            const tip = document.getElementById('auth-tip');
+            const raw = input ? input.value : '';
+            const phone = normalizeDigits(raw);
+            if (!isValidPhone(phone)) {
+                if (tip) tip.textContent = '请输入 11 位、1 开头的数字。';
+                return;
+            }
+            const admins = getAdminPhones();
+            const role = admins.includes(phone) ? 'admin' : 'guest';
+            AUTH_ROLE = role;
+            AUTH_PHONE = phone;
+            writeAuthToStorage(role, phone);
+            hideAuthModal();
+            applyRoleUi();
+        }
+
+        async function ensureAuth() {
+            const saved = readAuthFromStorage();
+            if (saved) {
+                AUTH_ROLE = saved.role;
+                AUTH_PHONE = saved.phone;
+                applyRoleUi();
+                return;
+            }
+            const admins = getAdminPhones();
+            const hint = admins.length > 0 ? '输入管理手机号为管理员，其它手机号为游客。' : '未配置管理员手机号，输入任意手机号将成为游客。';
+            showAuthModal(hint);
+            await new Promise((resolve) => {
+                const input = document.getElementById('auth-phone');
+                const onKey = (e) => { if (e.key === 'Enter') submitAuth(); };
+                if (input) input.addEventListener('keydown', onKey);
+                const observer = setInterval(() => {
+                    const modal = document.getElementById('auth-modal');
+                    if (modal && modal.style.display === 'none') { clearInterval(observer); resolve(); }
+                }, 120);
+            });
+        }
+
+        function switchAuth() {
+            try { localStorage.removeItem(AUTH_STORAGE_KEY); } catch {}
+            AUTH_ROLE = 'guest';
+            AUTH_PHONE = '';
+            applyRoleUi();
+            const admins = getAdminPhones();
+            const hint = admins.length > 0 ? '输入管理手机号为管理员，其它手机号为游客。' : '未配置管理员手机号，输入任意手机号将成为游客。';
+            showAuthModal(hint);
+        }
         
         const typeColorMap = {
             0: '#ff9500', // 晴
@@ -571,6 +709,7 @@
         }
 
         async function initDashboard() {
+            await ensureAuth();
             const todayStr = getTodayStr();
             try {
                 const res = await fetch(api('/api/get_weather'));
@@ -626,6 +765,7 @@
 
             myChart.on('click', function (params) {
                 if (params.componentType === 'series') {
+                    if (AUTH_ROLE !== 'admin') return;
                     const date = params.value[0];
                     editLog(date);
                 }
@@ -687,6 +827,7 @@
         }
 
         function openLogModal() {
+            if (AUTH_ROLE !== 'admin') { alert('当前为游客权限，无法编辑。'); return; }
             document.getElementById('modal-title').innerText = '编写施工日志';
             const today = getTodayStr();
             document.getElementById('log-date').value = today;
@@ -722,6 +863,7 @@
         }
 
         async function deleteLog() {
+            if (AUTH_ROLE !== 'admin') { alert('当前为游客权限，无法删除。'); return; }
             const dateVal = document.getElementById('log-date').value;
             if (!dateVal) { alert('请选择日期'); return; }
             if (!confirm(`确定删除 ${dateVal} 的施工日志吗？`)) return;
@@ -759,6 +901,7 @@
         }
 
         async function saveLog() {
+            if (AUTH_ROLE !== 'admin') { alert('当前为游客权限，无法保存。'); return; }
             const date = document.getElementById('log-date').value;
             const todayStr = getTodayStr();
             const logData = {
@@ -835,6 +978,7 @@
         }
 
         async function editLog(date) {
+            if (AUTH_ROLE !== 'admin') { alert('当前为游客权限，无法编辑。'); return; }
             const todayStr = getTodayStr();
             if (date > todayStr) { alert('不能更改未来日期的数据'); return; }
             const log = currentLogs.find(l => l.date === date) || { date: date };
@@ -1200,6 +1344,7 @@
         }
 
         async function refreshData(btnEl) {
+            if (AUTH_ROLE !== 'admin') { alert('当前为游客权限，无法同步。'); return; }
             const btn = btnEl || document.querySelector('.apple-btn');
             btn.innerText = '同步中...';
             btn.disabled = true;
